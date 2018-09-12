@@ -34,7 +34,8 @@ namespace NotebookAppApi
                 options.Database = Configuration.GetSection("MongoConnection:Database").Value;
             });
 
-            services.AddTransient<INoteRepository, NoteRepository>();
+            services.AddResponseCaching();
+            //services.AddTransient<INoteRepository, NoteRepository>();
             services.AddSingleton<INoteRepository, NoteRepository>();
         }
 

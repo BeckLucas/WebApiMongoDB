@@ -18,23 +18,27 @@ namespace NotebookAppApi.Repository
             _context = new NoteContext(settings);
         }
 
-        public async Task AddNote(Note item)
-        {
-            try
-            {
-                await _context.Notes.InsertOneAsync(item);
-            }
-            catch (Exception)
-            {
-                throw;
-            }
-        }
-
         public async Task<IEnumerable<Note>> GetAllNotes()
         {
             try
             {
-                return await _context.Notes.Find(_ => true).ToListAsync();
+                return await _context.Notes.Find<Note>(m => true).ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<IEnumerable<Note>> GetNote(string bodyText, DateTime updatedFrom, long headerSizeLimit)
+        {
+            try
+            {
+                var query = _context.Notes.Find(note => note.Body.Contains(bodyText) &&
+                                                        note.UpdatedOn >= updatedFrom &&
+                                                        note.HeaderImage.ImageSize <= headerSizeLimit);
+
+                return await query.ToListAsync();
             }
             catch (Exception ex)
             {
@@ -47,7 +51,7 @@ namespace NotebookAppApi.Repository
             try
             {
                 ObjectId internalId = GetInternalId(id);
-                return await _context.Notes.Find(note => note.Id == id || note.InternalId == internalId).FirstOrDefaultAsync();
+                return await _context.Notes.Find<Note>(m => m.Id == id || m.InternalId == internalId).FirstOrDefaultAsync();
             }
             catch (Exception ex)
             {
@@ -58,30 +62,85 @@ namespace NotebookAppApi.Repository
         private ObjectId GetInternalId(string id)
         {
             ObjectId internalId;
+
             if (!ObjectId.TryParse(id, out internalId))
+            {
                 internalId = ObjectId.Empty;
+            }
 
             return internalId;
         }
 
-        public Task<IEnumerable<Note>> GetNote(string bodyText, DateTime updatedFrom, long headerSizeLimit)
+        public async Task AddNote(Note item)
         {
-            throw new NotImplementedException();
+            try
+            {
+                await _context.Notes.InsertOneAsync(item);
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
 
-        public Task<bool> RemoveAllNotes()
+        public async Task<bool> RemoveNote(string id)
         {
-            throw new NotImplementedException();
+            try
+            {
+                DeleteResult actionResult = await _context.Notes.DeleteOneAsync(Builders<Note>.Filter.Eq("Id", id));
+
+                return actionResult.IsAcknowledged && actionResult.DeletedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                throw ex; 
+            }
         }
 
-        public Task<bool> RemoveNote(string id)
+        public async Task<bool> UpdateNote(string id, string body)
         {
-            throw new NotImplementedException();
+            var filter = Builders<Note>.Filter.Eq(s => s.Id, id);
+            var update = Builders<Note>.Update.Set(s => s.Body, body).CurrentDate(s => s.UpdatedOn);
+
+            try
+            {
+                UpdateResult updateResult = await _context.Notes.UpdateOneAsync(filter, update);
+
+                return updateResult.IsAcknowledged && updateResult.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+
         }
 
-        public Task<bool> UpdateNote(string id, string body)
+        public async Task<bool> UpdateNote(string id, Note item)
         {
-            throw new NotImplementedException();
+            try
+            {
+                ReplaceOneResult actionResult = await _context.Notes.ReplaceOneAsync(n => n.Id.Equals(id), item, new UpdateOptions { IsUpsert = true });
+
+                return actionResult.IsAcknowledged && actionResult.ModifiedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<bool> RemoveAllNotes()
+        {
+            try
+            {
+                DeleteResult actionResult = await _context.Notes.DeleteManyAsync(new BsonDocument());
+
+                return actionResult.IsAcknowledged && actionResult.DeletedCount > 0;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
 
         public Task<bool> UpdateNoteDocument(string id, string body)
